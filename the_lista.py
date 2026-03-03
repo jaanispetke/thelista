@@ -101,7 +101,7 @@ def get_stock_info(tickers_list, _df_hist):
         
     return info_df
 
-
+dfInfo = get_stock_info(tickers, dfHist)
 
 metrics = {
   "ROE": False,
