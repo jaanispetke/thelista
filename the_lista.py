@@ -24,6 +24,8 @@ Ensimmäinen osa lataa kirjastoja. Tässä voi poistaa tickers -muuttujan edest�
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import time
+import requests
 import streamlit as st
 
 # Set display width to some more
@@ -38,15 +40,26 @@ tickers = ["AALLON.HE", "ADMCM.HE", "ADMIN.HE", "AIFORIA.HE", "ALEX.HE", "ARVOSK
 
 @st.cache_data
 def fetchMasterData(tickers, history_period, history_interval):
-    # Init the dataframe
     df = pd.DataFrame()
-    # Loop through tickers to get stock data from yfinance
+    
+    # Create a custom session to look like a real web browser
+    session = requests.Session()
+    session.headers.update(
+        {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
+    )
+    
     for ticker_symbol in tickers:
-        oTicker = yf.Ticker(ticker_symbol)
+        oTicker = yf.Ticker(ticker_symbol, session=session)
         dfHistory = oTicker.history(period=history_period, interval=history_interval).add_prefix(ticker_symbol + "_")
-        df = df.merge(dfHistory, how='outer', left_index=True, right_index=True)
+        
+        if not dfHistory.empty:
+            df = df.merge(dfHistory, how='outer', left_index=True, right_index=True)
+            
+        # Pause for half a second so Yahoo doesn't block us
+        time.sleep(0.5) 
+        
     return df
-
+    
 def calculateMetrics(df, tickers, framesize, bollinger_mult):
     dfTmp = pd.DataFrame()
     for ticker in tickers:
@@ -62,9 +75,23 @@ dfHist = calculateMetrics(dfHist.copy(deep=True), tickers, framesize, bollinger_
 @st.cache_data
 def get_stock_info(tickers_list, _df_hist):
     info_df = pd.DataFrame(columns =  ["Name @PreviousClose", "ROE", "PE", "PB", "DIV", "BBPos"])
+    
+    # Create the custom session here too
+    session = requests.Session()
+    session.headers.update(
+        {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
+    )
+    
     for ticker_symbol in tickers_list:
-        oTicker = yf.Ticker(ticker_symbol).info
-        prev_close = oTicker.get("previousClose", np.nan)
+        oTicker = yf.Ticker(ticker_symbol, session=session)
+        
+        # A tiny safety net just in case Yahoo fails on one specific stock
+        try:
+            info = oTicker.info
+        except Exception:
+            info = {}
+            
+        prev_close = info.get("previousClose", np.nan)
         sma = _df_hist[ticker_symbol.upper()+"_SMA"].iloc[-1] if ticker_symbol.upper()+"_SMA" in _df_hist else np.nan
         boll_l = _df_hist[ticker_symbol.upper()+"_BOLLINGER_L"].iloc[-1] if ticker_symbol.upper()+"_BOLLINGER_L" in _df_hist else np.nan
         
@@ -73,16 +100,20 @@ def get_stock_info(tickers_list, _df_hist):
              bbpos = (prev_close - sma) / (sma - boll_l)
 
         info_df.loc[ticker_symbol] = [
-            oTicker.get("shortName", ticker_symbol) + " @" + str(prev_close),
-            oTicker.get("returnOnEquity", np.nan),
-            oTicker.get("trailingPE", np.nan),
-            oTicker.get("priceToBook", np.nan),
-            oTicker.get("trailingAnnualDividendYield", np.nan),
+            info.get("shortName", ticker_symbol) + " @" + str(prev_close),
+            info.get("returnOnEquity", np.nan),
+            info.get("trailingPE", np.nan),
+            info.get("priceToBook", np.nan),
+            info.get("trailingAnnualDividendYield", np.nan),
             bbpos
         ]
+        
+        # Pause here as well
+        time.sleep(0.5)
+        
     return info_df
 
-dfInfo = get_stock_info(tickers, dfHist)
+
 
 metrics = {
   "ROE": False,
