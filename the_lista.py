@@ -27,6 +27,10 @@ import numpy as np
 import time
 import streamlit as st
 
+# --------------------------
+st.set_page_config(page_title="The Lista", layout="wide")
+# --------------------------
+
 # Set display width to some more
 pd.set_option('display.width', 360)
 
