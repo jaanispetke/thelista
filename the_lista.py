@@ -25,7 +25,6 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import time
-import requests
 import streamlit as st
 
 # Set display width to some more
@@ -42,23 +41,18 @@ tickers = ["AALLON.HE", "ADMCM.HE", "ADMIN.HE", "AIFORIA.HE", "ALEX.HE", "ARVOSK
 def fetchMasterData(tickers, history_period, history_interval):
     df = pd.DataFrame()
     
-    # Create a custom session to look like a real web browser
-    session = requests.Session()
-    session.headers.update(
-        {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
-    )
-    
     for ticker_symbol in tickers:
-        oTicker = yf.Ticker(ticker_symbol, session=session)
+        oTicker = yf.Ticker(ticker_symbol) # Removed the session argument!
         dfHistory = oTicker.history(period=history_period, interval=history_interval).add_prefix(ticker_symbol + "_")
         
         if not dfHistory.empty:
             df = df.merge(dfHistory, how='outer', left_index=True, right_index=True)
             
-        # Pause for half a second so Yahoo doesn't block us
+        # Keep the pause to prevent rate limits!
         time.sleep(0.5) 
         
     return df
+    
     
 def calculateMetrics(df, tickers, framesize, bollinger_mult):
     dfTmp = pd.DataFrame()
@@ -76,14 +70,8 @@ dfHist = calculateMetrics(dfHist.copy(deep=True), tickers, framesize, bollinger_
 def get_stock_info(tickers_list, _df_hist):
     info_df = pd.DataFrame(columns =  ["Name @PreviousClose", "ROE", "PE", "PB", "DIV", "BBPos"])
     
-    # Create the custom session here too
-    session = requests.Session()
-    session.headers.update(
-        {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
-    )
-    
     for ticker_symbol in tickers_list:
-        oTicker = yf.Ticker(ticker_symbol, session=session)
+        oTicker = yf.Ticker(ticker_symbol) # Removed the session argument!
         
         # A tiny safety net just in case Yahoo fails on one specific stock
         try:
@@ -108,7 +96,7 @@ def get_stock_info(tickers_list, _df_hist):
             bbpos
         ]
         
-        # Pause here as well
+        # Keep the pause!
         time.sleep(0.5)
         
     return info_df
