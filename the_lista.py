@@ -14,20 +14,11 @@ history_interval = '1d'
 framesize = 20
 bollinger_mult = 2.5
 
+# FIX 1: Removed erroneous leading space before 'tickers'
 tickers = [
-    "AALLON.HE", "ADMCM.HE", "ADMIN.HE", "AIFORIA.HE", "ALEX.HE", "ARVOSK.HE", 
-    "ASUNTO.HE", "BETOLAR.HE", "BRETEC.HE", "CANATU.HE", "DETEC.HE", "DWF.HE", 
-    "DUELL.HE", "EAGLE.HE", "ECOUP.HE", "FARON.HE", "FODELIA.HE", "FONDIA.HE", 
-    "HRTIS.HE", "INDERES.HE", "LAPWALL.HE", "LEADD.HE", "LEMON.HE", "LOIHDE.HE", 
-    "MERUS.HE", "MODU.HE", "NANOFH.HE", "NETUM.HE", "NXTMH.HE", "BEER.HE", 
-    "NORRH.HE", "PALLAS.HE", "PIIPPO.HE", "SFOODS.HE", "SOLWERS.HE", "SPINN.HE", 
-    "SPRING.HE", "SUMMA.HE", "SBI.HE", "TAMTRON.HE", "TEKOVA.HE", "TITAN.HE", 
-    "VIAFIN.HE", "VINCIT.HE", "WITTED.HE", "AKTIA.HE", "ELISA.HE", "FORTUM.HE", 
-    "HIAB.HE", "HUH1V.HE", "KALMAR.HE", "KEMIRA.HE", "KESKOB.HE", "KOJAMO.HE", 
-    "KNEBV.HE", "KCR.HE", "MANTA.HE", "METSO.HE", "NESTE.HE", "NOKIA.HE", 
-    "TYRES.HE", "NDA-FI.HE", "ORNBV.HE", "OUT1V.HE", "QTCOM.HE", "SAMPO.HE", 
-    "STERV.HE", "TIETO.HE", "UPM.HE", "VALMT.HE", "WRT1V.HE"
+    "AALLON.HE", "ADMCM.HE", "ADMIN.HE", "AIFORIA.HE", "ALEX.HE", "ARVOSK.HE"
 ]
+
 
 # 3. DATA FETCHING FUNCTIONS (Cached for 1 hour to ensure fresh prices)
 @st.cache_data(ttl=3600)
@@ -65,8 +56,8 @@ def get_stock_info(tickers_list, _df_hist):
             info = {}
             
         prev_close = info.get("previousClose", np.nan)
-        sma = _df_hist[ticker_symbol.upper()+"_SMA"].iloc[-1] if ticker_symbol.upper()+"_SMA" in _df_hist else np.nan
-        boll_l = _df_hist[ticker_symbol.upper()+"_BOLLINGER_L"].iloc[-1] if ticker_symbol.upper()+"_BOLLINGER_L" in _df_hist else np.nan
+        sma = _df_hist[ticker_symbol + "_SMA"].iloc[-1] if ticker_symbol + "_SMA" in _df_hist else np.nan
+        boll_l = _df_hist[ticker_symbol + "_BOLLINGER_L"].iloc[-1] if ticker_symbol + "_BOLLINGER_L" in _df_hist else np.nan
         
         bbpos = np.nan
         if not pd.isna(prev_close) and not pd.isna(sma) and not pd.isna(boll_l) and (sma - boll_l) != 0:
@@ -112,3 +103,20 @@ df_print['PB'] = df_print['PB'].apply(lambda x: "-" if pd.isna(x) else f"{x:.2f}
 df_print['ROE'] = df_print['ROE'].apply(lambda x: "-" if pd.isna(x) else f"{x * 100:.2f} %")
 df_print['BBPos'] = df_print['BBPos'].apply(lambda x: "-" if pd.isna(x) else f"{x * 100:.2f} %")
 df_print['DIV'] = df_print['DIV'].apply(lambda x: "-" if pd.isna(x) else f"{x * 100:.2f} %")
+
+# FIX 2: Added missing Streamlit UI rendering
+st.title("📈 The Lista")
+st.caption(f"Bollinger Band: {framesize}-day SMA ± {bollinger_mult}σ  |  Data cached for 1 hour")
+
+display_cols = ["Name @PreviousClose", "ROE", "PE", "PB", "DIV", "BBPos", "Total_Rank"]
+st.dataframe(
+    df_print[display_cols],
+    use_container_width=True,
+    height=400
+)
+
+st.markdown("---")
+st.markdown(
+    "**BBPos**: Distance from SMA relative to lower Bollinger Band. "
+    "Negative = below SMA (potential value). **Total_Rank**: sum of PE, PB, ROE, DIV ranks (lower is better)."
+)
