@@ -108,4 +108,7 @@ dfInfo = dfInfo.sort_values("Total_Rank", ascending=True)
 # 6. FORMAT TABLE FOR DISPLAY
 df_print = dfInfo.copy()
 df_print['PE'] = df_print['PE'].apply(lambda x: "-" if pd.isna(x) else f"{x:.2f}")
-df_print['PB'] = df_print
+df_print['PB'] = df_print['PB'].apply(lambda x: "-" if pd.isna(x) else f"{x:.2f}")
+df_print['ROE'] = df_print['ROE'].apply(lambda x: "-" if pd.isna(x) else f"{x * 100:.2f} %")
+df_print['BBPos'] = df_print['BBPos'].apply(lambda x: "-" if pd.isna(x) else f"{x * 100:.2f} %")
+df_print['DIV'] = df_print['DIV'].apply(lambda x: "-" if pd.isna(x) else f"{x * 100:.2f} %")
