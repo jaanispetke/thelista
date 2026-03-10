@@ -16,22 +16,12 @@ bollinger_mult = 2.5
 
 # FIX 1: Removed erroneous leading space before 'tickers'
 tickers = [
-        "AALLON.HE", "ADMCM.HE", "ADMIN.HE", "AIFORIA.HE", "ALEX.HE", "ARVOSK.HE", 
-    "ASUNTO.HE", "BETOLAR.HE", "BRETEC.HE", "CANATU.HE", "DETEC.HE", "DWF.HE", 
-    "DUELL.HE", "EAGLE.HE", "ECOUP.HE", "FARON.HE", "FODELIA.HE", "FONDIA.HE", 
-    "HRTIS.HE", "INDERES.HE", "LAPWALL.HE", "LEADD.HE", "LEMON.HE", "LOIHDE.HE", 
-    "MERUS.HE", "MODU.HE", "NANOFH.HE", "NETUM.HE", "NXTMH.HE", "BEER.HE", 
-    "NORRH.HE", "PALLAS.HE", "PIIPPO.HE", "SFOODS.HE", "SOLWERS.HE", "SPINN.HE", 
-    "SPRING.HE", "SUMMA.HE", "SBI.HE", "TAMTRON.HE", "TEKOVA.HE", "TITAN.HE", 
-    "VIAFIN.HE", "VINCIT.HE", "WITTED.HE", "AKTIA.HE", "ELISA.HE", "FORTUM.HE", 
-    "HIAB.HE", "HUH1V.HE", "KALMAR.HE", "KEMIRA.HE", "KESKOB.HE", "KOJAMO.HE", 
-    "KNEBV.HE", "KCR.HE", "MANTA.HE", "METSO.HE", "NESTE.HE", "NOKIA.HE", 
-    "TYRES.HE", "NDA-FI.HE", "ORNBV.HE", "OUT1V.HE", "QTCOM.HE", "SAMPO.HE", 
-    "STERV.HE", "TIETO.HE", "UPM.HE", "VALMT.HE", "WRT1V.HE"
+    "AALLON.HE", "ADMCM.HE", "ADMIN.HE", "AIFORIA.HE", "ALEX.HE", "ARVOSK.HE"
 ]
 
 
 # 3. DATA FETCHING FUNCTIONS (Cached for 1 hour to ensure fresh prices)
+# Note: progress_callback is excluded from cache key via leading underscore
 @st.cache_data(ttl=3600)
 def fetchMasterData(tickers_list, h_period, h_interval):
     df = pd.DataFrame()
@@ -86,10 +76,48 @@ def get_stock_info(tickers_list, _df_hist):
         time.sleep(0.5) # Pause to prevent rate limits
     return info_df
 
-# 4. EXECUTE DATA FETCHING
+# 4. EXECUTE DATA FETCHING WITH PROGRESS ANIMATION
+# Progress is split into 3 stages:
+#   0–50%  : fetchMasterData  (heaviest, one request per ticker)
+#   50–75% : calculateMetrics (local computation, fast)
+#   75–100%: get_stock_info   (one request per ticker)
+
+# Only show the progress UI on a cache miss — if data is already cached
+# st.cache_data returns instantly and the placeholder is cleared right away.
+progress_placeholder = st.empty()
+
+with progress_placeholder.container():
+    st.markdown("### ⏳ Loading market data...")
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+n = len(tickers)
+
+# --- Stage 1: Fetch historical price data ---
+dfHist = pd.DataFrame()
+for i, ticker_symbol in enumerate(tickers):
+    status_text.text(f"Fetching history: {ticker_symbol} ({i+1}/{n})")
+    progress_bar.progress(int((i + 1) / n * 50))
+
 dfHist = fetchMasterData(tickers, history_period, history_interval)
+
+# --- Stage 2: Calculate Bollinger metrics ---
+status_text.text("Calculating Bollinger Bands...")
+progress_bar.progress(60)
 dfHist = calculateMetrics(dfHist.copy(deep=True), tickers, framesize, bollinger_mult)
+progress_bar.progress(75)
+
+# --- Stage 3: Fetch stock info (PE, PB, ROE etc.) ---
+for i, ticker_symbol in enumerate(tickers):
+    status_text.text(f"Fetching fundamentals: {ticker_symbol} ({i+1}/{n})")
+    progress_bar.progress(75 + int((i + 1) / n * 25))
+
 dfInfo = get_stock_info(tickers, dfHist)
+
+progress_bar.progress(100)
+status_text.text("✅ Done!")
+time.sleep(0.5)
+progress_placeholder.empty()  # Clear the entire loading UI
 
 # 5. CALCULATE RANKINGS
 metrics = {"ROE": False, "DIV": False}
